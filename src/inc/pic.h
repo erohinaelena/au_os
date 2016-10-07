@@ -13,6 +13,6 @@ void init_pic();
 
 void send_nsEOI(uint64_t int_num);
 
-void set_interrupt_mask(uint8_t mask);
+void set_interrupt_mask(uint16_t mask);
 
 #endif /*__DESC_H__*/

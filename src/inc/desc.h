@@ -3,7 +3,6 @@
 
 #include <stdint.h>
 
-#define SERIAL_PORT 0x3f8
 #define IDT_SIZE 33
 
 struct desc_table_ptr {
@@ -12,8 +11,6 @@ struct desc_table_ptr {
 } __attribute__((packed));
 
 void init_IDT();
-void serial_init();
-void printStr(char * str);
 
 static inline void read_idtr(struct desc_table_ptr *ptr)
 {

@@ -37,10 +37,4 @@ void init_IDT(){
 	
 }
 
-void serial_init(){
-	out8(SERIAL_PORT + 1, 0x00);
-	out8(SERIAL_PORT + 3, 0x80);
-	out8(SERIAL_PORT + 0, 0x01); 
-	out8(SERIAL_PORT + 1, 0x00); 
-	out8(SERIAL_PORT + 3, 0x03);
-}
+

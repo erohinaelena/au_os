@@ -9,5 +9,5 @@ void init_pit(){
 	out8(COMMAND_PIT, 0x14);
 	out8(DATA_PIT, init);
 	out8(DATA_PIT, init >> 8);
-	set_interrupt_mask(0xe);
+	set_interrupt_mask(0xfe);
 }

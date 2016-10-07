@@ -12,6 +12,7 @@ static void qemu_gdb_hang(void)
 #include <ioport.h>
 #include <pic.h>
 #include <pit.h>
+#include <serial.h>
 
 void main(void)
 {

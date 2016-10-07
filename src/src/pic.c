@@ -16,13 +16,15 @@ void init_pic() {
 }
 
 void send_nsEOI(uint64_t int_num) {
-	if (int_num >= 32) {
+	if (int_num >= 32 && int_num < 40) {
 		out8(MASTER_COMMAND, 32);
+	} else if (int_num >= 40) {
 		out8(SLAVE_COMMAND, 32);
+		out8(MASTER_COMMAND, 32);
 	}
 }
 
-void set_interrupt_mask(uint8_t mask) {
-	out8(MASTER_DATA, mask);
+void set_interrupt_mask(uint16_t mask) {
+	out8(MASTER_DATA, mask>>8);
 	out8(SLAVE_DATA, mask);
 }

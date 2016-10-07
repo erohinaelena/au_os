@@ -1,5 +1,6 @@
 #include <desc.h>
 #include <pic.h>
+#include <serial.h>
 
 struct frame 
 {
@@ -22,27 +23,6 @@ struct frame
 	uint64_t error_code;
 }__attribute__((packed));
 
-
-void print_number(uint64_t number) {
-	uint64_t number_part;
-	int length = 0;
-	char char_number[4];
-	while(number > 0){
-		number_part = number % 10;
-		number = number / 10;
-		char_number[length] = (char)(48 + number_part);
-		length++;
-	}
-	for (int i = 0; i < length / 2; i++){
-		char tmp = char_number[i];
-		char_number[i] = char_number[length - i - 1];
-		char_number[length - i - 1] = tmp;
-	}
-	
-	char_number[length]='\0';
-	printStr(char_number);
-
-}
 
 void c_handler(struct frame* regs) {
 	printStr("\nint! ");
