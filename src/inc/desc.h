@@ -3,14 +3,10 @@
 
 #include <stdint.h>
 
-#define IDT_SIZE 33
-
 struct desc_table_ptr {
 	uint16_t size;
 	uint64_t addr;
 } __attribute__((packed));
-
-void init_IDT();
 
 static inline void read_idtr(struct desc_table_ptr *ptr)
 {
