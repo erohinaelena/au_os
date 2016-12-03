@@ -2,8 +2,6 @@
 #include <memory.h>
 #include <debug.h>
 
-static struct spinlock balloc_lock;
-
 struct mboot_info {
 	uint32_t flags;
 	uint8_t ignore0[40];
@@ -121,7 +119,6 @@ static void __balloc_remove_range(struct rb_tree *tree,
 uintptr_t __balloc_alloc(size_t size, uintptr_t align,
 			uintptr_t from, uintptr_t to)
 {
-	lock(&balloc_lock);
 	struct rb_tree *tree = &free_ranges;
 	struct rb_node *link = tree->root;
 	struct memory_node *ptr = 0;
@@ -151,14 +148,12 @@ uintptr_t __balloc_alloc(size_t size, uintptr_t align,
 			if (ptr->end > addr + size)
 				__balloc_add_range(tree, addr + size, ptr->end);
 			balloc_free_node(ptr);
-			unlock(&balloc_lock);
 
 			return addr;
 		}
 
 		ptr = RB2MEMORY_NODE(rb_next(&ptr->link.rb));
 	}
-	unlock(&balloc_lock);
 
 	return to;
 }
@@ -180,11 +175,7 @@ uintptr_t balloc_alloc(size_t size, uintptr_t from, uintptr_t to)
 
 void balloc_free(uintptr_t begin, uintptr_t end)
 {
-	lock(&balloc_lock);
-
 	__balloc_add_range(&free_ranges, begin, end);
-	unlock(&balloc_lock);
-
 }
 
 
