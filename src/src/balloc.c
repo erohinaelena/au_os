@@ -2,6 +2,7 @@
 #include <memory.h>
 #include <debug.h>
 
+
 struct mboot_info {
 	uint32_t flags;
 	uint8_t ignore0[40];
@@ -148,7 +149,6 @@ uintptr_t __balloc_alloc(size_t size, uintptr_t align,
 			if (ptr->end > addr + size)
 				__balloc_add_range(tree, addr + size, ptr->end);
 			balloc_free_node(ptr);
-
 			return addr;
 		}
 
@@ -163,7 +163,6 @@ uintptr_t balloc_alloc(size_t size, uintptr_t from, uintptr_t to)
 	/* The only situation when we would like a larger alignment is
 	 * when we allocate page for a page table, in that case we would
 	 * need PAGE_SIZE alignment, IOW it's quite reasonable default. */
-
 	uintptr_t align = 64;
 
 	if (size <= 32) align = 32;

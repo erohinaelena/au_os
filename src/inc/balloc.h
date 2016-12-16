@@ -5,7 +5,6 @@
 #include <stddef.h>
 #include <rbtree.h>
 #include <list.h>
-#include <locks.h>
 
 struct mboot_info;
 

@@ -7,7 +7,11 @@
 #include <print.h>
 #include <ints.h>
 #include <time.h>
-#include "thread.h"
+#include <threads.h>
+#include <mutex.h>
+#include <condition.h>
+#include "fs.h"
+
 
 static void qemu_gdb_hang(void)
 {
@@ -132,21 +136,125 @@ static void test_buddy(void)
 	}
 }
 
-/*void thread1() {
-	int i = 0;
-	while(1) {
-		printf("tread1 %i\n", i);
-		i++;
+static void __th1_main(void *data)
+{
+	const int id = (int)(uintptr_t)data;
+
+	for (size_t i = 0; i != 5; ++i) {
+		printf("i'm %d\n", id);
+		force_schedule();
 	}
 }
 
-void thread2() {
-	int i = 0;
-	while(1) {
-		printf("tread2 %i\n", i);
-		i++;
+static void test_threads(void)
+{
+	struct thread *th1 = thread_create(&__th1_main, (void *)1);
+	struct thread *th2 = thread_create(&__th1_main, (void *)2);
+
+	thread_activate(th1);
+	thread_activate(th2);
+
+	thread_join(th2);
+	thread_join(th1);
+
+	thread_destroy(th1);
+	thread_destroy(th2);
+}
+
+static void wait(unsigned long long count)
+{
+	const unsigned long long time = current_time();
+
+	while (time + count > current_time())
+		force_schedule();
+}
+
+static void __th2_main(void *data)
+{
+	struct mutex *mtx = data;
+
+	for (size_t i = 0; i != 5; ++i) {
+		mutex_lock(mtx);
+		printf("%p acquired mutex\n", thread_current());
+		wait(100);
+		printf("%p released mutex\n", thread_current());
+		mutex_unlock(mtx);
 	}
-}*/
+}
+
+static void test_mutex(void)
+{
+	struct mutex mtx;
+	struct thread *th1 = thread_create(&__th2_main, (void *)&mtx);
+	struct thread *th2 = thread_create(&__th2_main, (void *)&mtx);
+
+	mutex_setup(&mtx);
+	thread_activate(th1);
+	thread_activate(th2);
+
+	thread_join(th2);
+	thread_join(th1);
+
+	thread_destroy(th1);
+	thread_destroy(th2);
+}
+
+struct future {
+	struct mutex mtx;
+	struct condition cond;
+	int value;
+	int set;
+};
+
+static void future_setup(struct future *future)
+{
+	mutex_setup(&future->mtx);
+	condition_setup(&future->cond);
+	future->value = 0;
+	future->set = 0;
+}
+
+static void future_set(struct future *future, int value)
+{
+	mutex_lock(&future->mtx);
+	future->value = value;
+	future->set = 1;
+	condition_broadcast(&future->cond);
+	mutex_unlock(&future->mtx);
+}
+
+static int future_get(struct future *future)
+{
+	int res;
+
+	mutex_lock(&future->mtx);
+	while (!future->set)
+		condition_wait(&future->cond, &future->mtx);
+	res = future->value;
+	mutex_unlock(&future->mtx);
+	return res;
+}
+
+static void __th3_main(void *data)
+{
+	struct future *fut = data;
+
+	wait(1000);
+	future_set(fut, 42);
+}
+
+static void test_condition(void)
+{
+	struct future fut;
+	struct thread *th = thread_create(&__th3_main, &fut);
+
+	future_setup(&fut);
+	thread_activate(th);
+	BUG_ON(future_get(&fut) != 42);
+
+	thread_join(th);
+	thread_destroy(th);
+}
 
 void main(void *bootstrap_info)
 {
@@ -160,19 +268,35 @@ void main(void *bootstrap_info)
 	page_alloc_setup();
 	mem_alloc_setup();
 	kmap_setup();
+	threads_setup();
 	enable_ints();
 
-	// struct thread tr1 = create_thread((*thread1)());
-	// struct thread tr2 = create_thread((void*)(&thread2));
-	// thread_switcher(&tr1, &tr2);
+	init_fs();
+	mkdir("test/test2");
+	struct file* f = open("test/test1");
+	write(f, 0, 3, "abc");
+	char buf[10];
+	read(f, 0, 2, buf);
+	close(f);
+	printf("\nbuf:\n");
+	printf(buf);
+	printf("\n");
+	struct file_list* fl = readdir("test");
+	printf("In dir test:\n");
+	for (uint32_t i=0; i < fl->count; i++){
+			printf(fl->list[i]);
+			printf("\n");
+	}
 
-	
 	printf("Tests Begin\n");
 	test_buddy();
 	test_slab();
 	test_alloc();
 	test_kmap();
+	test_threads();
+	test_mutex();
+	test_condition();
 	printf("Tests Finished\n");
-
-	while (1);
+	
+	idle();
 }

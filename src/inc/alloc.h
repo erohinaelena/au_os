@@ -4,7 +4,8 @@
 #include <stddef.h>
 #include <memory.h>
 #include <list.h>
-#include <locks.h>
+#include <spinlock.h>
+
 
 struct mem_cache {
 	/* We split all slabs in three sets:
@@ -18,13 +19,14 @@ struct mem_cache {
 	struct list_head partial_pools;
 	struct list_head busy_pools;
 
+	struct spinlock lock;
+
 	/* struct alloc_pool layout */
 	size_t meta_offs;
 	size_t obj_count;
 	size_t mask_words;
 	size_t obj_size;
 	int pool_order;
-	struct spinlock lock;
 };
 
 void mem_cache_setup(struct mem_cache *cache, size_t size, size_t align);

@@ -3,7 +3,6 @@
 
 #include <stdint.h>
 #include <rbtree.h>
-#include <locks.h>
 
 #define __PTE_PRESENT	((pte_t)1 << 0)
 #define __PTE_LARGE	((pte_t)1 << 7)
@@ -16,7 +15,6 @@
 
 #define PT_ENTRIES	512
 
-//static struct spinlock paging_lock;
 
 typedef uint64_t pte_t;
 

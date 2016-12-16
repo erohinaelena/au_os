@@ -10,6 +10,7 @@
 #define MIN_POOL_OBJS	8
 #define PAGE_CACHE_BIT	0
 
+
 struct mem_pool {
 	struct list_head ll;
 	struct page *page;
@@ -143,22 +144,26 @@ static void mem_pool_destroy(struct mem_cache *cache, struct mem_pool *pool)
 
 void mem_cache_setup(struct mem_cache *cache, size_t size, size_t align)
 {
-	cache->lock.locked = 0;
 	mem_cache_layout_setup(cache, size, align);
 
 	list_init(&cache->free_pools);
 	list_init(&cache->partial_pools);
 	list_init(&cache->busy_pools);
+
+	spin_setup(&cache->lock);
 }
 
 void mem_cache_shrink(struct mem_cache *cache)
 {
-	lock(&cache->lock);
 	struct list_head free_slabs;
 	struct list_head *head, *ptr;
 
+	const int enable = spin_lock_irqsave(&cache->lock);
+
 	list_init(&free_slabs);
 	list_splice(&cache->free_pools, &free_slabs);
+
+	spin_unlock_irqrestore(&cache->lock, enable);
 
 	head = &free_slabs;
 	ptr = head->next;
@@ -169,8 +174,6 @@ void mem_cache_shrink(struct mem_cache *cache)
 		ptr = ptr->next;
 		mem_pool_destroy(cache, pool);
 	}
-	unlock(&cache->lock);
-
 }
 
 void mem_cache_release(struct mem_cache *cache)
@@ -247,7 +250,7 @@ static void mem_pool_free(struct mem_cache *cache, struct mem_pool *pool,
 	BUG_ON(pool->free > cache->obj_count);
 }
 
-void *__mem_cache_alloc(struct mem_cache *cache)
+static void *__mem_cache_alloc(struct mem_cache *cache)
 {
 	if (!list_empty(&cache->partial_pools)) {
 		struct list_head *ptr = list_first(&cache->partial_pools);
@@ -286,16 +289,17 @@ void *__mem_cache_alloc(struct mem_cache *cache)
 	return data;
 }
 
-void * mem_cache_alloc(struct mem_cache *cache){
-	lock(&cache->lock);
+void *mem_cache_alloc(struct mem_cache *cache)
+{
+	const int enable = spin_lock_irqsave(&cache->lock);
 	void *ptr = __mem_cache_alloc(cache);
-	unlock(&cache->lock);
+
+	spin_unlock_irqrestore(&cache->lock, enable);
 	return ptr;
 }
 
-void mem_cache_free(struct mem_cache *cache, void *ptr)
+static void __mem_cache_free(struct mem_cache *cache, void *ptr)
 {
-	lock(&cache->lock);
 	const size_t pool_size = (size_t)1 << (cache->pool_order + PAGE_SHIFT);
 	const uintptr_t addr = align_down((uintptr_t)ptr, pool_size);
 	struct mem_pool *pool = (struct mem_pool *)(addr + cache->meta_offs);
@@ -311,7 +315,14 @@ void mem_cache_free(struct mem_cache *cache, void *ptr)
 		list_del(&pool->ll);
 		list_add(&pool->ll, &cache->free_pools);
 	}
-	unlock(&cache->lock);
+}
+
+void mem_cache_free(struct mem_cache *cache, void *ptr)
+{
+	const int enable = spin_lock_irqsave(&cache->lock);
+
+	__mem_cache_free(cache, ptr);
+	spin_unlock_irqrestore(&cache->lock, enable);
 }
 
 
@@ -375,11 +386,11 @@ void *mem_alloc(size_t size)
 
 	page_clear_bit(page, PAGE_CACHE_BIT);
 	page->u.order = order;
+
 	return va(page_addr(page));
 }
 
-
-static void __mem_free(void *ptr)
+void mem_free(void *ptr)
 {
 	if (!ptr)
 		return;
@@ -397,10 +408,6 @@ static void __mem_free(void *ptr)
 	page_clear_bit(page, PAGE_CACHE_BIT);
 	page->u.order = 0;
 	page_free((~mask & pa(ptr)), order);
-}
-
-void mem_free(void* ptr){
-	__mem_free(ptr);
 }
 
 void *mem_realloc(void *ptr, size_t size)
