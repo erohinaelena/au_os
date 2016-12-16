@@ -16,7 +16,7 @@ struct file* create_file()
 	file->is_dir = 0;
 	file->next = 0;
 	file->child = 0;
-	file->lock = 0;
+	spin_setup(&file->lock);
 	file->size = 0;
 	file->size_pow = 1;
 	file->data = 0;
@@ -71,7 +71,7 @@ int strcmp_begin(char* name1, char* name2){
 }
 
 struct file* mkfile(struct file* file, char* name) {
-	spin_lock(file->lock);
+	spin_lock(&file->lock);
 	printf("make file\n");
 	printf(name);
 	printf("\n");
@@ -90,12 +90,12 @@ struct file* mkfile(struct file* file, char* name) {
 
 	if (*end == '\0') {
 		node->is_dir = 0;
-		spin_unlock(file->lock);
+		spin_unlock(&file->lock);
 		return node;
 	} else {
 		node->is_dir = 1;
 	}
-	spin_unlock(file->lock);
+	spin_unlock(&file->lock);
 	return mkfile(node, end);
 }
 
@@ -122,11 +122,11 @@ struct file* open(char* name){
 	if (cur == 0 || cur->is_dir == 1) {
 		cur = mkfile(prev, start);
 	}
-	spin_lock(cur->lock);
+	spin_lock(&cur->lock);
 	return cur;
 }
 void close(struct file* file) {
-	spin_unlock(file->lock);
+	spin_unlock(&file->lock);
 }
 
 void read(struct file* file, uint32_t offset, uint32_t size, char* buffer){

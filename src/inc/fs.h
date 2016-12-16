@@ -14,7 +14,7 @@ struct file
 	char* data;
 	uint32_t offset;
 	int is_dir;
-	struct spinlock* lock;
+	struct spinlock lock;
 };
 
 void init_fs();
