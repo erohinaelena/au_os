@@ -57,17 +57,6 @@ void strcpy(char* start, char* end, char* dest){
 	}
 	if(*end != '\0') dest[i] = '\0';
 }
-int cmp(char* name, char* start, char* end) {
-	while (*name != 0 && start != end) {
-		if (*name != *start) {
-			return 0;
-		}
-		name++;
-		start++;
-	}
-	if (*name == '\0' && start == end) return 1;
-	return 0;
-}
 
 int strcmp_begin(char* name1, char* name2){
 	for(size_t i = 0; i < strlen(name1); i++){
@@ -113,6 +102,7 @@ struct file* find_parent_dir_of_file(char* path) {
 			spin_unlock(&prev_neighbour->lock);
 		}
 	}
+	if (cur) spin_unlock(&cur->lock);
 	if (has_dir(start)) {
 		return 0;
 	}
@@ -213,8 +203,14 @@ void mkdir(char* path){
 		f->is_dir = 1;
 	}
 }
-void touch(char *name){
-	mkfile(root, name);
+void touch(char *path){
+	struct file* parent = find_parent_dir_of_file(path);
+	if (parent) {
+		char* file_name = get_last_path_part(path);
+		struct file* f = find_file_in_dir(parent, file_name);
+		if (f) printf("file %s is already exist\n", file_name);
+		else f = mkfile(parent, file_name);
+	}
 }
 
 void list_resize(struct file_list* list) {
