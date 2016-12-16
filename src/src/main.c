@@ -272,7 +272,10 @@ void main(void *bootstrap_info)
 	enable_ints();
 
 	init_fs();
+	mkdir("test");
+	mkdir("test/test1");
 	mkdir("test/test2");
+
 	struct file* f = open("test/test1");
 	write(f, 0, 3, "abc");
 	char buf[10];

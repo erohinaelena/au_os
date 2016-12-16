@@ -38,6 +38,15 @@ char* get_path_part(char* c) {
 	}
 	return c;
 }
+char* get_last_path_part(char* c) {
+	char* pos = c;
+	size_t i=0;
+	while(i < strlen(c)) {
+		if (c[i] == '/') pos = c + i + 1;
+		i++;
+	}
+	return pos;
+}
 
 void strcpy(char* start, char* end, char* dest){
 	size_t i=0;
@@ -61,70 +70,103 @@ int cmp(char* name, char* start, char* end) {
 }
 
 int strcmp_begin(char* name1, char* name2){
-	printf("strcmp\n");
-
-	for(size_t i = 0; i < strlen(name1)-1; i++){
+	for(size_t i = 0; i < strlen(name1); i++){
 		if (name1[i] != name2[i]) return 0;
 		i++;
 	}
 	return 1;
 }
-
-struct file* mkfile(struct file* file, char* name) {
-	spin_lock(&file->lock);
-	printf("make file\n");
-	printf(name);
-	printf("\n");
-	if (cmp(file->name, name, name + strlen(name))){
-		return file;
+int has_dir (char* name){
+	for (size_t i = 1; i < strlen(name)-1; i++) {
+		if (name[i] == '/') return 1;
 	}
-	struct file* node = create_file();
-	node->next = file->child;
-	file->child = node;
-	char* end = get_path_part(name+1);
-	strcpy(name, end, node->name);
-
-	if (node->name[strlen(node->name)-1] == '/'){
-		node->name[strlen(node->name)-1] = '\0';
-	}
-
-	if (*end == '\0') {
-		node->is_dir = 0;
-		spin_unlock(&file->lock);
-		return node;
-	} else {
-		node->is_dir = 1;
-	}
-	spin_unlock(&file->lock);
-	return mkfile(node, end);
+	return 0;
 }
 
-struct file* open(char* name){
-	char* start = name;
+struct file* find_parent_dir_of_file(char* path) {
+	char* start = path;
 	char* end = get_path_part(start+1);
 	struct file* cur = root->child;
-	struct file* prev = root;
+	struct file* parent = root;
+	struct file* prev_neighbour = 0;
+	spin_lock(&cur->lock);
 	while (start != end) {
 		if (cur == 0) {
 			break;
 		}
-		if (cmp(cur->name, start, end)) {
-			prev = cur;
+		if (strcmp_begin(cur->name, start)>0) {
+			if (strlen(cur->name) == strlen(start)) {
+				break;
+			}
+			parent = cur;
 			cur = cur->child;
+			if (cur) spin_lock(&cur->lock);
+			spin_unlock(&parent->lock);
 			char* next_end = get_path_part(end+1);
 			start = end;
 			end = next_end;
 		}
 		else {
+			prev_neighbour = cur;
+			cur = cur->next;
+			if (cur) spin_lock(&cur->lock);
+			spin_unlock(&prev_neighbour->lock);
+		}
+	}
+	if (has_dir(start)) {
+		return 0;
+	}
+	return parent;
+}
+
+struct file* find_file_in_dir(struct file* dir, char* name) {
+	spin_lock(&dir->lock);
+	struct file* cur = dir->child;
+	while (cur) {
+		if (strcmp_begin(cur->name, name)>0 && strlen(cur->name) == strlen(name)) {
+			spin_unlock(&dir->lock);
+			return cur;
+		} else {
 			cur = cur->next;
 		}
 	}
-	if (cur == 0 || cur->is_dir == 1) {
-		cur = mkfile(prev, start);
-	}
-	spin_lock(&cur->lock);
-	return cur;
+	spin_unlock(&dir->lock);
+	return 0;
 }
+
+struct file* mkfile(struct file* parent, char* name) {
+	spin_lock(&parent->lock);
+	printf("make file %s\n", name);
+	
+	struct file* node = create_file();
+	node->next = parent->child;
+	parent->child = node;
+	strcpy(name, name + strlen(name), node->name);
+
+	if (node->name[strlen(node->name)] != '\0'){
+		node->name[strlen(node->name)] = '\0';
+	}
+	spin_unlock(&parent->lock);
+	return node;
+}
+
+struct file* open(char* path){
+	struct file* parent = find_parent_dir_of_file(path);
+	if (parent) {
+		char* file_name = get_last_path_part(path);
+		struct file* opened = find_file_in_dir(parent, file_name);
+		if (!opened) {
+			printf("not found %s, now will be created\n", file_name);
+			opened = mkfile(parent, file_name);
+		}
+		printf("%s opened\n", file_name);
+		spin_lock(&opened->lock);
+		return opened;
+	} else {
+		return 0;
+	}
+}
+
 void close(struct file* file) {
 	spin_unlock(&file->lock);
 }
@@ -161,8 +203,15 @@ void write(struct file* file, uint32_t offset, uint32_t size, char* buffer){
 
 	file->size = file->offset;
 }
-void mkdir(char* name){
-	mkfile(root, name)->is_dir = 1;
+void mkdir(char* path){
+	struct file* parent = find_parent_dir_of_file(path);
+	if (parent) {
+		char* file_name = get_last_path_part(path);
+		struct file* f = find_file_in_dir(parent, file_name);
+		if (f) printf("file %s is already exist\n", file_name);
+		else f = mkfile(parent, file_name);
+		f->is_dir = 1;
+	}
 }
 void touch(char *name){
 	mkfile(root, name);
@@ -177,31 +226,17 @@ void list_resize(struct file_list* list) {
 	list->list = new_list;
 }
 
-struct file_list* readdir (char* name){
+struct file_list* readdir (char* path){
 	struct file_list* list = mem_alloc(sizeof(struct file_list));
 	uint32_t size = 256;
 	list->list = mem_alloc(sizeof(char*)*size);
-	char* start = name;
-	char* end = get_path_part(start+1);
-	struct file* cur = root->child;
-	while (start != end) {
-		printf("start c\n");
-		if (cur == 0) {
-			break;
-		}
-		if (strcmp_begin(cur->name, start)>0) {
-			if (strlen(cur->name) == strlen(start)) break;
-			char* next_end = get_path_part(end+1);
-			start = end;
-			end = next_end;
-		} else {
-			cur = cur->next;	
-		}
-	}
-
-	cur = cur->child;
+	struct file* parent = find_parent_dir_of_file(path);
+	if (!parent) return 0;
+	char* file_name = get_last_path_part(path);
+	struct file* cur = find_file_in_dir(parent, file_name);
+	if (!cur) return 0;
 	printf("readdir\n");
-
+	cur = cur->child;
 	list->count = 0;
 
 	if (cur) {
