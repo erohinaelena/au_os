@@ -110,7 +110,6 @@ struct file* find_parent_dir_of_file(char* path) {
 }
 
 struct file* find_file_in_dir(struct file* dir, char* name) {
-	spin_lock(&dir->lock);
 	struct file* cur = dir->child;
 	while (cur) {
 		if (strcmp_begin(cur->name, name)>0 && strlen(cur->name) == strlen(name)) {
@@ -120,12 +119,11 @@ struct file* find_file_in_dir(struct file* dir, char* name) {
 			cur = cur->next;
 		}
 	}
-	spin_unlock(&dir->lock);
 	return 0;
 }
 
 struct file* mkfile(struct file* parent, char* name) {
-	spin_lock(&parent->lock);
+	
 	printf("make file %s\n", name);
 	
 	struct file* node = create_file();
@@ -136,13 +134,13 @@ struct file* mkfile(struct file* parent, char* name) {
 	if (node->name[strlen(node->name)] != '\0'){
 		node->name[strlen(node->name)] = '\0';
 	}
-	spin_unlock(&parent->lock);
 	return node;
 }
 
 struct file* open(char* path){
 	struct file* parent = find_parent_dir_of_file(path);
 	if (parent) {
+		spin_lock(&parent->lock);
 		char* file_name = get_last_path_part(path);
 		struct file* opened = find_file_in_dir(parent, file_name);
 		if (!opened) {
@@ -151,6 +149,8 @@ struct file* open(char* path){
 		}
 		printf("%s opened\n", file_name);
 		spin_lock(&opened->lock);
+		spin_unlock(&parent->lock);
+
 		return opened;
 	} else {
 		return 0;
@@ -196,20 +196,26 @@ void write(struct file* file, uint32_t offset, uint32_t size, char* buffer){
 void mkdir(char* path){
 	struct file* parent = find_parent_dir_of_file(path);
 	if (parent) {
+		spin_lock(&parent->lock);
 		char* file_name = get_last_path_part(path);
 		struct file* f = find_file_in_dir(parent, file_name);
 		if (f) printf("file %s is already exist\n", file_name);
 		else f = mkfile(parent, file_name);
 		f->is_dir = 1;
+		spin_unlock(&parent->lock);
+
 	}
 }
 void touch(char *path){
 	struct file* parent = find_parent_dir_of_file(path);
 	if (parent) {
+		spin_lock(&parent->lock);
+
 		char* file_name = get_last_path_part(path);
 		struct file* f = find_file_in_dir(parent, file_name);
 		if (f) printf("file %s is already exist\n", file_name);
 		else f = mkfile(parent, file_name);
+		spin_unlock(&parent->lock);
 	}
 }
 
