@@ -229,14 +229,17 @@ void list_resize(struct file_list* list) {
 }
 
 struct file_list* readdir (char* path){
-	struct file_list* list = mem_alloc(sizeof(struct file_list));
-	uint32_t size = 256;
-	list->list = mem_alloc(sizeof(char*)*size);
 	struct file* parent = find_parent_dir_of_file(path);
 	if (!parent) return 0;
+
 	char* file_name = get_last_path_part(path);
 	struct file* cur = find_file_in_dir(parent, file_name);
 	if (!cur) return 0;
+
+	struct file_list* list = mem_alloc(sizeof(struct file_list));
+	uint32_t size = 256;
+	list->list = mem_alloc(sizeof(char*)*size);
+	
 	printf("readdir\n");
 	cur = cur->child;
 	list->count = 0;
