@@ -161,15 +161,15 @@ void close(struct file* file) {
 	spin_unlock(&file->lock);
 }
 
-void read(struct file* file, uint32_t offset, uint32_t size, char* buffer){
+uint32_t read(struct file* file, uint32_t offset, uint32_t size, char* buffer){
 	uint32_t cur = 0;
-	file->offset = offset;
-	while (file->offset < file->size && cur < size) {
-		buffer[file->offset] = file->data[offset + cur];
-		file->offset++;
+	while (offset + cur < file->size && cur < size) {
+		buffer[cur] = file->data[offset + cur];
 		cur++;
 	}
+	return cur;
 }
+
 void resize(struct file* file) {
 	printf("resize\n");
 	char* data = mem_alloc(file->size_pow * 2);
@@ -181,17 +181,16 @@ void resize(struct file* file) {
 	file->size_pow *= 2;
 }
 void write(struct file* file, uint32_t offset, uint32_t size, char* buffer){
-	while (file->size_pow - file->offset < size - offset) {
+	while (file->size_pow < size + offset) {
 		resize(file);
 	}
 	uint32_t cur = 0;
 	while (cur < size) {
-		file->data[file->offset] = buffer[cur + offset];
+		file->data[offset + cur] = buffer[cur];
 		cur++;
-		file->offset++;
 	}
 
-	file->size = file->offset;
+	file->size = file->size + offset + size;
 }
 void mkdir(char* path){
 	struct file* parent = find_parent_dir_of_file(path);
@@ -239,7 +238,7 @@ struct file_list* readdir (char* path){
 	struct file_list* list = mem_alloc(sizeof(struct file_list));
 	uint32_t size = 256;
 	list->list = mem_alloc(sizeof(char*)*size);
-	
+
 	printf("readdir\n");
 	cur = cur->child;
 	list->count = 0;

@@ -279,7 +279,7 @@ void main(void *bootstrap_info)
 	struct file* f = open("test/test1");
 	write(f, 0, 3, "abc");
 	char buf[10];
-	read(f, 0, 2, buf);
+	read(f, 1, 2, buf);
 	close(f);
 	printf("\nbuf:\n");
 	printf(buf);

@@ -12,7 +12,6 @@ struct file
 	uint32_t size;
 	uint32_t size_pow;
 	char* data;
-	uint32_t offset;
 	int is_dir;
 	struct spinlock lock;
 };
@@ -20,7 +19,7 @@ struct file
 void init_fs();
 struct file* open(char *path);
 void close(struct file*);
-void read(struct file* file, uint32_t offset, uint32_t size, char* buffer);
+uint32_t read(struct file* file, uint32_t offset, uint32_t size, char* buffer);
 void write(struct file* file, uint32_t offset, uint32_t size, char* buffer);
 void mkdir(char *path);
 void touch(char *path);
