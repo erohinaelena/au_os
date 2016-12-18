@@ -181,16 +181,27 @@ void resize(struct file* file) {
 	file->size_pow *= 2;
 }
 void write(struct file* file, uint32_t offset, uint32_t size, char* buffer){
-	while (file->size_pow < size + offset) {
+	while (file->size_pow < offset + size){
 		resize(file);
 	}
+
 	uint32_t cur = 0;
+	if (offset > file->size) {
+		cur = file->size;
+		while (cur < offset){
+			file->data[cur] = 0;
+			cur++;
+		}
+	}
+	
+	cur = 0;
 	while (cur < size) {
 		file->data[offset + cur] = buffer[cur];
 		cur++;
 	}
-
-	file->size = file->size + offset + size;
+	if (offset + size > file->size) {
+		file->size = offset + size;
+	}
 }
 void mkdir(char* path){
 	struct file* parent = find_parent_dir_of_file(path);
